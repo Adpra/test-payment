@@ -32,7 +32,7 @@ class CheckoutController extends Controller
 
         $params = array(
             'transaction_details' => array(
-                'order_id' => rand(),
+                'order_id' => $transaction->id,
                 'gross_amount' => $data['price'],
             ),
 
@@ -58,10 +58,23 @@ class CheckoutController extends Controller
         return view('checkout',  compact('transaction', 'product'));
     }
 
+    public function callback(Request $request)
+    {
+        $serverKey = config('midtrans.serverKey');
+        $hashed = hash('sha512', $request->order_id . $request->status_code . $request->gross_amount . $serverKey);
+
+        if ($hashed == $request->signature_key) {
+            if(in_array($request->transaction_status, ['capture', 'settlement'])) {
+                $transaction = Transaction::find($request->order_id);
+                $transaction->update([
+                    'status' => 'success'
+                ]);
+            }
+        }
+    }
+
     public function success(Transaction $transaction)
     {
-        $transaction->status = 'success';
-        $transaction->save();
         return view('success', compact('transaction'));
     }
 }
